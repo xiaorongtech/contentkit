@@ -3,3 +3,12 @@ __pycache__/
 *.log
 content/assets/
 .DS_Store
+graphify-out/
+.e2e/
+.browsers/
+.npm-cache/
+.uv-cache/
+.tools/
+.uv-tools/
+content/
+node_modules/
