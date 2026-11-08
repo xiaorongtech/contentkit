@@ -12,3 +12,4 @@ graphify-out/
 .uv-tools/
 content/
 node_modules/
+tests/__pycache__/

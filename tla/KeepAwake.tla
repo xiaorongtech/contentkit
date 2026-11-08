@@ -1,56 +1,43 @@
 ---- MODULE KeepAwake ----
-\* keep-awake.sh 状态机：Idle -> Inhibit -> Sleep -> Inhibit...
-\*                 Inhibit -> Fail -> Idle(重试)
-\* retries 有界封顶 {0,1,2}，Fail 到顶保持，避免状态空间爆炸
+\* keep-awake.sh 状态机（与脚本对齐的简化模型）：
+\* Idle(循环起点) -> Inhibit(已抑制息屏，子进程 sleep 期间持锁)
+\*   -> Sleep(子进程结束，锁释放，短暂等待)
+\*   -> Inhibit -> ...
+\* 脚本没有重试计数器：systemd-inhibit 失败只记日志继续循环，
+\* 所以模型里没有 Fail/Retry 状态，也没有 retries 变量。
 EXTENDS Naturals
 
-VARIABLES state, retries
+VARIABLES state
 
-States == {"Idle", "Inhibit", "Sleep", "Fail"}
-RetryVals == {0, 1, 2}
+States == {"Idle", "Inhibit", "Sleep"}
 
 Init ==
-    /\ state = "Idle"
-    /\ retries = 0
+    state = "Idle"
 
 Wake ==
     /\ state = "Idle"
     /\ state' = "Inhibit"
-    /\ retries' = retries
 
 InhibitDone ==
     /\ state = "Inhibit"
     /\ state' = "Sleep"
-    /\ retries' = retries
 
 SleepDone ==
     /\ state = "Sleep"
     /\ state' = "Inhibit"
-    /\ retries' = retries
-
-Fail ==
-    /\ state = "Inhibit"
-    /\ state' = "Fail"
-    /\ retries' = IF retries < 2 THEN retries + 1 ELSE retries
-
-Retry ==
-    /\ state = "Fail"
-    /\ state' = "Idle"
-    /\ retries' = retries
 
 Next ==
     \/ Wake
     \/ InhibitDone
     \/ SleepDone
-    \/ Fail
-    \/ Retry
 
-Spec == Init /\ [][Next]_<<state, retries>>
+Spec == Init /\ [][Next]_state
 
 TypeOK ==
-    state \in States /\ retries \in RetryVals
+    state \in States
 
-FailHasRetries ==
-    state = "Fail" => retries > 0
+\* 抑制窗口有界是结构保证的：Inhibit 只有一条出边到 Sleep，
+\* 子进程结束锁即释放，下一步必回 Sleep，不会无限持有。
+\* （不出带撇的伪不变量，所以 TLC 只验 TypeOK。）
 
 ====
